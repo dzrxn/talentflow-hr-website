@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import StatCard from "../components/StatCard";
 
 const API_BASE =
@@ -17,16 +17,6 @@ export default function OffersData() {
   const [rows, setRows] = useState([]);
   const didLoad = useRef(false);
   const [loading, setLoading] = useState(true);
-
-  const cleanText = (value) => String(value || "").trim();
-
-  const getStatus = (item) =>
-    cleanText(
-      item["Status"] ||
-      item["Offer Status"] ||
-      item["Offers Status"] ||
-      item["OfferStatus"]
-    );
 
   const loadOffersData = async () => {
     try {
@@ -52,39 +42,18 @@ export default function OffersData() {
     loadOffersData();
   }, []);
 
-  const statusCounts = useMemo(() => {
-    const counts = {};
+  const totalsRow = rows.find(
+    (item) =>
+      String(item.Month || "").trim().toLowerCase() === "total"
+  );
 
-    OFFER_STATUS_OPTIONS.forEach((status) => {
-      counts[status] = 0;
-    });
-
-    rows.forEach((item) => {
-      const status = getStatus(item).toLowerCase();
-
-      if (status === "offers released" || status === "offer released") {
-        counts["Offers Released"] += 1;
-      }
-
-      if (status === "joined") {
-        counts["Joined"] += 1;
-      }
-
-      if (status === "offers declined" || status === "offer declined") {
-        counts["Offers Declined"] += 1;
-      }
-
-      if (status === "offers revoked" || status === "offer revoked") {
-        counts["Offers Revoked"] += 1;
-      }
-
-      if (status === "yet to join" || status === "yet to joined") {
-        counts["Yet to join"] += 1;
-      }
-    });
-
-    return counts;
-  }, [rows]);
+  const statusCounts = {
+    "Offers Released": Number(totalsRow?.["Offers Released"] || 0),
+    Joined: Number(totalsRow?.["Joined"] || 0),
+    "Offers Declined": Number(totalsRow?.["Offers Declined"] || 0),
+    "Offers Revoked": Number(totalsRow?.["Offers Revoked"] || 0),
+    "Yet to join": Number(totalsRow?.["Yet to join"] || 0),
+  };
 
   return (
     <>
@@ -102,7 +71,9 @@ export default function OffersData() {
           <div className="cards-grid">
             <StatCard
               label="Total Offers"
-              value={rows.length}
+              value={
+                Object.values(statusCounts).reduce((a, b) => a + b, 0)
+              }
               change="All offer records"
               colorClass="c1"
             />

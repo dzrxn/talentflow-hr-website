@@ -114,9 +114,6 @@ export default function HospitalityDashboard() {
 
       setApiError("");
 
-      const res = await fetch(
-        `${API_BASE}/api/hospitality/dashboard`
-      );
 
 
       const result = await res.json();

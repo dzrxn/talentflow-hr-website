@@ -40,7 +40,7 @@ export default function InternshipData() {
 
     didLoad.current = true;
 
-    loadInternships();
+    loadInternshipData();
   }, []);
 
   const summary = useMemo(() => {

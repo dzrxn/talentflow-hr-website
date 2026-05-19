@@ -49,7 +49,7 @@ export default function OffersData() {
 
     didLoad.current = true;
 
-    loadOffers();
+    loadOffersData();
   }, []);
 
   const statusCounts = useMemo(() => {

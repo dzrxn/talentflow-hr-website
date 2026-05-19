@@ -46,6 +46,8 @@ const TIME_FILTERS = [
   "This Year",
 ];
 
+const REMOVED_ENTITIES = ["chalukya samrat"];
+
 export default function Reports() {
   const [jobs, setJobs] = useState([]);
   const didLoad = useRef(false);
@@ -61,6 +63,8 @@ export default function Reports() {
 
   const clean = (value) => String(value ?? "").trim();
 
+  const normalize = (value) => clean(value).toLowerCase().replace(/\s+/g, " ");
+
   const toNumber = (value) => {
     const num = Number(clean(value).replace(/,/g, ""));
     return Number.isFinite(num) ? num : 0;
@@ -74,11 +78,15 @@ export default function Reports() {
   };
 
   const getSlNo = (item) => getValue(item, ["Sl No.", "Sl No", "S No"]);
+
   const getDesignation = (item) =>
     clean(getValue(item, ["Designation", "Role", "Position"]));
+
   const getFunction = (item) =>
     clean(getValue(item, ["Function", "Department", "FUNCTION"]));
+
   const getEntity = (item) => clean(getValue(item, ["Entity", "ENTITY"]));
+
   const getStatus = (item) => clean(getValue(item, ["Status", "STATUS"]));
 
   const getCreatedDate = (item) =>
@@ -114,6 +122,11 @@ export default function Reports() {
         "Internal Referral",
       ])
     );
+
+  const isRemovedEntity = (entity) => {
+    const value = normalize(entity);
+    return REMOVED_ENTITIES.some((removed) => value.includes(removed));
+  };
 
   const parseDate = (value) => {
     if (!value) return null;
@@ -191,10 +204,12 @@ export default function Reports() {
       if (!item) return false;
 
       const slNo = clean(getSlNo(item)).toLowerCase();
+      const entity = getEntity(item);
+
       const text = [
         getDesignation(item),
         getFunction(item),
-        getEntity(item),
+        entity,
         getStatus(item),
       ]
         .join(" ")
@@ -202,11 +217,12 @@ export default function Reports() {
 
       if (slNo === "total" || slNo === "grand total") return false;
       if (text.includes("grand total")) return false;
+      if (isRemovedEntity(entity)) return false;
 
       return (
         getDesignation(item) ||
         getFunction(item) ||
-        getEntity(item) ||
+        entity ||
         getStatus(item) ||
         getTotalPositions(item) > 0 ||
         getJoined(item) > 0 ||
@@ -275,12 +291,18 @@ export default function Reports() {
   }, [jobs]);
 
   const entities = useMemo(() => {
-    const list = jobs.map(getEntity).filter(Boolean);
+    const list = jobs
+      .map(getEntity)
+      .filter(Boolean)
+      .filter((entity) => !isRemovedEntity(entity));
+
     return ["All Entities", ...Array.from(new Set(list)).sort()];
   }, [jobs]);
 
   const filteredJobs = useMemo(() => {
     let rows = [...jobs];
+
+    rows = rows.filter((item) => !isRemovedEntity(getEntity(item)));
 
     if (selectedFunction !== "All Functions") {
       rows = rows.filter((item) => getFunction(item) === selectedFunction);

@@ -11,32 +11,37 @@ const API_BASE = RAW_API_BASE
   .replace(/\/api$/i, "");
 
 const STATUS_OPTIONS = [
-  "In Process",
+  "Screen Selected",
   "Screen Rejected",
-  "Rejected In Interview",
-  "Offer Declined",
-  "Offer Accepted",
-  "Joined",
-  "No available for interview",
-  "Dint process as position closed",
   "Duplicate Submission",
+  "No Show",
+  "Rejected By Panel",
+  "Offer Accepted",
+  "Offer Declined",
+  "Joined",
+  "Future Reference",
 ];
 
-const SUBMITTED_BY_OPTIONS = [
-  "Sira",
-  "R2R",
-  "Talent Corner",
-  "TA Maniram",
-  "Adecco",
+const ACTIVE_VENDOR_OPTIONS = [
+  "Sira Consulting India Pvt Ltd",
+  "Talent Corner Hr Services Private Limited",
+  "Adecco India Private Limited",
+  "On Time FS Private Limited",
+];
+
+const INACTIVE_VENDOR_OPTIONS = [
   "Talent Infinity",
   "Formore Talent",
-  "On Time FS",
   "Cernobia",
-  "TA Praveen",
-  "TA New",
-  "Internal",
+  "R2R Consultants LLP",
 ];
 
+const TALENT_ACQUISITION_OPTIONS = [
+  "Maniram - Talent Acquisition",
+  "Praveen - Talent Acquisition",
+  "Internal Referrals",
+  "Careers and Linkedin",
+];
 
 const FUNCTION_OPTIONS = [
   "Presales",
@@ -63,6 +68,7 @@ const FUNCTION_OPTIONS = [
   "Purchase",
   "HR",
   "Payroll",
+  "Housekeeping",
 ];
 
 export default function SubmissionData() {
@@ -70,9 +76,11 @@ export default function SubmissionData() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
 
-  const [selectedSubmittedBy, setSelectedSubmittedBy] = useState("All");
-  const [selectedFunction, setSelectedFunction] = useState("All");
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedActiveVendor, setSelectedActiveVendor] = useState("All");
+  const [selectedInactiveVendor, setSelectedInactiveVendor] = useState("All");
+  const [selectedTalentTeam, setSelectedTalentTeam] = useState("All");
+  const [selectedFunction, setSelectedFunction] = useState("All");
 
   const cleanText = (value) => String(value || "").trim();
 
@@ -118,24 +126,54 @@ export default function SubmissionData() {
     const text = normalizeText(value);
 
     if (!text) return "";
-    if (text.includes("in process")) return "In Process";
+
+    if (
+      text.includes("screen selected") ||
+      text.includes("selected in screening") ||
+      text === "selected"
+    )
+      return "Screen Selected";
+
     if (text.includes("screen") && text.includes("reject"))
       return "Screen Rejected";
-    if (text.includes("interview") && text.includes("reject"))
-      return "Rejected In Interview";
-    if (text.includes("offer") && text.includes("declin"))
-      return "Offer Declined";
+
+    if (text.includes("duplicate")) return "Duplicate Submission";
+
+    if (text.includes("no show")) return "No Show";
+
+    if (
+      text.includes("rejected by panel") ||
+      (text.includes("panel") && text.includes("reject")) ||
+      text.includes("rejected in interview")
+    )
+      return "Rejected By Panel";
+
     if (text.includes("offer") && text.includes("accept"))
       return "Offer Accepted";
+
+    if (text.includes("offer") && text.includes("declin"))
+      return "Offer Declined";
+
     if (text.includes("joined")) return "Joined";
-    if (text.includes("not available") || text.includes("no available"))
-      return "No available for interview";
-    if (text.includes("position closed") || text.includes("dint process"))
-      return "Dint process as position closed";
-    if (text.includes("duplicate")) return "Duplicate Submission";
+
+    if (
+      text.includes("future reference") ||
+      text.includes("future") ||
+      text.includes("hold")
+    )
+      return "Future Reference";
 
     return cleanText(value);
   };
+
+  const getStatus = (item) =>
+    normalizeStatus(
+      getValueByPossibleKeys(item, [
+        "Status",
+        "Candidate Status",
+        "Submission Status",
+      ])
+    );
 
   const parseDate = (value) => {
     if (!value) return null;
@@ -164,15 +202,6 @@ export default function SubmissionData() {
     return `${year}-${month}-${day}`;
   };
 
-  const getStatus = (item) =>
-    normalizeStatus(
-      getValueByPossibleKeys(item, [
-        "Status",
-        "Candidate Status",
-        "Submission Status",
-      ])
-    );
-
   const getDateValue = (item) =>
     getValueByPossibleKeys(item, [
       "Date of Submission",
@@ -182,6 +211,9 @@ export default function SubmissionData() {
     ]);
 
   const getDate = (item) => parseDate(getDateValue(item));
+
+  const isMatched = (actual, selected) =>
+    selected === "All" || normalizeText(actual) === normalizeText(selected);
 
   const loadData = async () => {
     try {
@@ -235,23 +267,44 @@ export default function SubmissionData() {
 
   const filteredRows = useMemo(() => {
     return rows.filter((item) => {
+      const submittedBy = getSubmittedBy(item);
+      const functionName = getFunction(item);
+
       const itemDate = getDate(item);
       const itemDateKey = formatDateKey(itemDate);
 
       const dateMatch = !selectedDate || itemDateKey === selectedDate;
 
-      const submittedByMatch =
-        selectedSubmittedBy === "All" ||
-        normalizeText(getSubmittedBy(item)) ===
-          normalizeText(selectedSubmittedBy);
+      const activeVendorMatch = isMatched(
+        submittedBy,
+        selectedActiveVendor
+      );
 
-      const functionMatch =
-        selectedFunction === "All" ||
-        normalizeText(getFunction(item)) === normalizeText(selectedFunction);
+      const inactiveVendorMatch = isMatched(
+        submittedBy,
+        selectedInactiveVendor
+      );
 
-      return dateMatch && submittedByMatch && functionMatch;
+      const talentTeamMatch = isMatched(submittedBy, selectedTalentTeam);
+
+      const functionMatch = isMatched(functionName, selectedFunction);
+
+      return (
+        dateMatch &&
+        activeVendorMatch &&
+        inactiveVendorMatch &&
+        talentTeamMatch &&
+        functionMatch
+      );
     });
-  }, [rows, selectedDate, selectedSubmittedBy, selectedFunction]);
+  }, [
+    rows,
+    selectedDate,
+    selectedActiveVendor,
+    selectedInactiveVendor,
+    selectedTalentTeam,
+    selectedFunction,
+  ]);
 
   const statusCounts = useMemo(() => {
     const counts = {};
@@ -272,9 +325,11 @@ export default function SubmissionData() {
   }, [filteredRows]);
 
   const clearFilters = () => {
-    setSelectedSubmittedBy("All");
-    setSelectedFunction("All");
     setSelectedDate("");
+    setSelectedActiveVendor("All");
+    setSelectedInactiveVendor("All");
+    setSelectedTalentTeam("All");
+    setSelectedFunction("All");
   };
 
   return (
@@ -282,7 +337,8 @@ export default function SubmissionData() {
       <h1 className="page-title">NB Submission Data</h1>
 
       <p className="page-subtitle">
-        Submission dashboard with status summary.
+        Submission dashboard with separate vendor, Talent Acquisition, function
+        and status filters.
       </p>
 
       {apiError && (
@@ -301,11 +357,49 @@ export default function SubmissionData() {
 
         <select
           style={styles.select}
-          value={selectedSubmittedBy}
-          onChange={(e) => setSelectedSubmittedBy(e.target.value)}
+          value={selectedActiveVendor}
+          onChange={(e) => {
+            setSelectedActiveVendor(e.target.value);
+            setSelectedInactiveVendor("All");
+            setSelectedTalentTeam("All");
+          }}
         >
-          <option value="All">All Submitted By</option>
-          {SUBMITTED_BY_OPTIONS.map((name) => (
+          <option value="All">Active Vendors</option>
+          {ACTIVE_VENDOR_OPTIONS.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          style={styles.select}
+          value={selectedInactiveVendor}
+          onChange={(e) => {
+            setSelectedInactiveVendor(e.target.value);
+            setSelectedActiveVendor("All");
+            setSelectedTalentTeam("All");
+          }}
+        >
+          <option value="All">Inactive Vendors</option>
+          {INACTIVE_VENDOR_OPTIONS.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          style={styles.select}
+          value={selectedTalentTeam}
+          onChange={(e) => {
+            setSelectedTalentTeam(e.target.value);
+            setSelectedActiveVendor("All");
+            setSelectedInactiveVendor("All");
+          }}
+        >
+          <option value="All">Talent Acquisition Team</option>
+          {TALENT_ACQUISITION_OPTIONS.map((name) => (
             <option key={name} value={name}>
               {name}
             </option>
@@ -385,7 +479,7 @@ const styles = {
 
   select: {
     height: "42px",
-    minWidth: "220px",
+    minWidth: "260px",
     padding: "0 12px",
     borderRadius: "12px",
     border: "1px solid #bbf7d0",

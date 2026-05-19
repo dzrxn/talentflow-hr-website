@@ -8,95 +8,160 @@
 
 body {
   font-family: "DM Sans", sans-serif;
-  background: #f7f6f2;
-  color: #1a1a1a;
+  background: #0d0d0d;
+  color: #f5e6c8;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
+/* Inputs + Buttons */
 button,
 input,
-select {
+select,
+textarea {
   font-family: "DM Sans", sans-serif;
 }
 
 button {
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
+/* Main Page */
 .page {
   padding: 2rem;
   flex: 1;
+  background: linear-gradient(
+    135deg,
+    #0d0d0d 0%,
+    #141414 45%,
+    #1b1b1b 100%
+  );
+  min-height: 100vh;
 }
 
+/* Titles */
 .page-title {
   font-family: "Fraunces", serif;
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 600;
-  margin-bottom: 0.3rem;
+  color: #d4af37;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.5px;
 }
 
 .page-subtitle {
-  color: #888;
-  font-size: 0.9rem;
+  color: #bfa46a;
+  font-size: 0.92rem;
   margin-bottom: 2rem;
 }
 
+/* Form */
 .form-group {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.3rem;
 }
 
 .form-group label {
   display: block;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  color: #555;
-  margin-bottom: 6px;
+  color: #d4af37;
+  margin-bottom: 7px;
+  letter-spacing: 0.3px;
 }
 
-.form-group input {
+.form-group input,
+.form-group select,
+.form-group textarea {
   width: 100%;
-  padding: 11px 14px;
-  border: 1.5px solid #e0ddd6;
-  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid rgba(212, 175, 55, 0.25);
+  border-radius: 12px;
   font-size: 0.95rem;
-  background: #fff;
+  background: #1a1a1a;
+  color: #f5e6c8;
+  transition: all 0.3s ease;
 }
 
-.form-group input:focus {
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #8c7b5d;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
-  border-color: #1a1a2e;
+  border-color: #d4af37;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15);
 }
 
+/* Primary Button */
 .btn-primary {
   width: 100%;
-  padding: 12px;
-  background: #1a1a2e;
-  color: #e8d5b7;
+  padding: 13px;
+  background: linear-gradient(135deg, #d4af37, #b8860b);
+  color: #0d0d0d;
   border: none;
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-weight: 500;
+  border-radius: 12px;
+  font-size: 0.96rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  box-shadow: 0 6px 18px rgba(212, 175, 55, 0.25);
 }
 
 .btn-primary:hover {
-  background: #2a2a4e;
+  background: linear-gradient(135deg, #e6c65c, #d4af37);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(212, 175, 55, 0.35);
 }
 
+/* Empty Row */
 .empty-row {
   text-align: center;
-  color: #aaa;
+  color: #8c7b5d;
   padding: 2rem;
+  font-size: 0.95rem;
 }
 
+/* Settings Card */
 .settings-card {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #f0ede8;
-  padding: 1.5rem;
+  background: linear-gradient(
+    145deg,
+    rgba(25, 25, 25, 0.95),
+    rgba(15, 15, 15, 0.95)
+  );
+  border-radius: 18px;
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  padding: 1.8rem;
   max-width: 500px;
+  box-shadow:
+    0 10px 35px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(212, 175, 55, 0.06);
+  backdrop-filter: blur(12px);
 }
 
 .settings-card h3 {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.3rem;
+  color: #d4af37;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* Optional Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4af37;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #f0c75e;
 }

@@ -94,8 +94,7 @@ const ENTITIES = [
   "Nambiar Builders Private Limited",
   "Nambiar Builders LLP",
   "Nambiar Enterprises LLP",
-  "NB Club Bellezea",
-  "Chalukya Samrat",
+ 
 ];
 
 const FUNCTIONS = [
@@ -124,6 +123,10 @@ const FUNCTIONS = [
   "Execution - Plant & Machinery",
   "Structural Design",
   "Purchase",
+  "HR",
+  "Talent Acquisition",
+  "Payroll",
+
 ];
 
 const TIME_FILTERS = [

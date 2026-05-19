@@ -11,6 +11,45 @@ import hospitalityRoutes from "./routes/hospitalityRoutes.js";
 
 dotenv.config();
 
+/* =========================
+   DEFAULT GOOGLE SHEET ENV
+========================= */
+
+process.env.SUBMISSION_SHEET_ID =
+  process.env.SUBMISSION_SHEET_ID ||
+  "1r7NF_hJjSnSkscCmKq1U8-H1yvJ_9NWkrQQ1i6ouNGI";
+
+process.env.SUBMISSIONS_SHEET_ID =
+  process.env.SUBMISSIONS_SHEET_ID ||
+  "1r7NF_hJjSnSkscCmKq1U8-H1yvJ_9NWkrQQ1i6ouNGI";
+
+process.env.SUBMISSION_RANGE =
+  process.env.SUBMISSION_RANGE || "Sheet1!A:Z";
+
+process.env.SUBMISSIONS_RANGE =
+  process.env.SUBMISSIONS_RANGE || "Sheet1!A:Z";
+
+process.env.INTERNSHIP_SHEET_ID =
+  process.env.INTERNSHIP_SHEET_ID ||
+  "1iiMDOwAj5E0Y6B2TufOBk8y6SPps6s9Dq9nVJt-RLl0";
+
+process.env.INTERNSHIP_RANGE =
+  process.env.INTERNSHIP_RANGE || "Sheet1!A:Z";
+
+process.env.OFFER_SHEET_ID =
+  process.env.OFFER_SHEET_ID ||
+  "1-1oh2ZwP5qbt86JX54pM-O769NRwjGoWFV-fxE0gHHU";
+
+process.env.OFFERS_SHEET_ID =
+  process.env.OFFERS_SHEET_ID ||
+  "1-1oh2ZwP5qbt86JX54pM-O769NRwjGoWFV-fxE0gHHU";
+
+process.env.OFFER_RANGE =
+  process.env.OFFER_RANGE || "Sheet5!A:Z";
+
+process.env.OFFERS_RANGE =
+  process.env.OFFERS_RANGE || "Sheet5!A:Z";
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -83,6 +122,10 @@ app.get("/api/env-check", (req, res) => {
       ? "SET"
       : "MISSING",
 
+    GOOGLE_SERVICE_ACCOUNT_FILE: process.env.GOOGLE_SERVICE_ACCOUNT_FILE
+      ? "SET"
+      : "MISSING",
+
     SUBMISSION_SHEET_ID: process.env.SUBMISSION_SHEET_ID ? "SET" : "MISSING",
     SUBMISSIONS_SHEET_ID: process.env.SUBMISSIONS_SHEET_ID ? "SET" : "MISSING",
     SUBMISSION_RANGE: process.env.SUBMISSION_RANGE || "MISSING",
@@ -111,15 +154,7 @@ mountRoute("/api/users", userRoutes);
 mountRoute("/api/dashboard", dashboardRoutes);
 mountRoute("/api/reports", reportRoutes);
 
-/*
-  IMPORTANT:
-  Internship / Offers / Submissions data must come from this route only:
-  /api/sheets/internship
-  /api/sheets/offers
-  /api/sheets/submissions
-*/
 mountRoute("/api/sheets", googleSheetRoutes);
-
 mountRoute("/api/hospitality", hospitalityRoutes);
 
 /* =========================
@@ -191,8 +226,10 @@ app.use((error, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`✅ Health: http://localhost:${PORT}/api/health`);
+  console.log(`✅ Env Check: http://localhost:${PORT}/api/env-check`);
   console.log(`✅ Sheets: http://localhost:${PORT}/api/sheets`);
   console.log(`✅ Submissions: http://localhost:${PORT}/api/sheets/submissions`);
   console.log(`✅ Internship: http://localhost:${PORT}/api/sheets/internship`);
+  console.log(`✅ Internships: http://localhost:${PORT}/api/sheets/internships`);
   console.log(`✅ Offers: http://localhost:${PORT}/api/sheets/offers`);
 });

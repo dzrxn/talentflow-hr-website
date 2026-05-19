@@ -22,11 +22,6 @@ export default function HospitalityReports() {
         `${API_BASE}/api/hospitality/dashboard`
       );
 
-
-
-
-
-
       const result = await res.json();
 
       setRows(Array.isArray(result.data) ? result.data : []);
@@ -43,7 +38,7 @@ export default function HospitalityReports() {
 
     didLoad.current = true;
 
-    loadHospitalityReports();
+    loadReports();
   }, []);
 
   const getFunctionName = (item) =>

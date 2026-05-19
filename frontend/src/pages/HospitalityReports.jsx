@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 
 const API_BASE =
   import.meta.env.VITE_API_URL ||
@@ -347,7 +347,7 @@ export default function HospitalityReports() {
                         style={{
                           ...styles.barFill,
                           width: `${(item.count /
-                              maxCount) *
+                            maxCount) *
                             100
                             }%`,
                         }}

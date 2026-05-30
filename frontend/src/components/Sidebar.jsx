@@ -17,6 +17,12 @@ export default function Sidebar({ page, setPage }) {
     },
 
     {
+      id: "submission-data",
+      icon: "▥",
+      label: "NB Submission Data",
+    },
+
+    {
       id: "offers-data",
       icon: "▨",
       label: "NB Offer Data",
@@ -28,11 +34,7 @@ export default function Sidebar({ page, setPage }) {
       label: "NB Internship Data",
     },
 
-    {
-      id: "submission-data",
-      icon: "▥",
-      label: "NB Submission Data",
-    },
+
 
     {
       id: "hospitality",

@@ -1,5 +1,4 @@
-
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StatCard from "../components/StatCard";
 import { Bar, Doughnut } from "react-chartjs-2";
 
@@ -13,88 +12,26 @@ import {
   Legend,
 } from "chart.js";
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://talentflow-hr-website-1jga.onrender.com";
-
-const valueLabelPlugin = {
-  id: "valueLabelPlugin",
-
-  afterDatasetsDraw(chart) {
-    const { ctx } = chart;
-
-    ctx.save();
-
-    chart.data.datasets.forEach((dataset, datasetIndex) => {
-      const meta = chart.getDatasetMeta(datasetIndex);
-
-      meta.data.forEach((element, index) => {
-        const value = Number(dataset.data[index] || 0);
-
-        if (value <= 0) return;
-
-        ctx.font = "700 12px Inter, Arial, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        if (chart.config.type === "bar") {
-          const position = element.tooltipPosition();
-
-          ctx.fillStyle = "#111827";
-          ctx.fillText(value, position.x, position.y - 10);
-        }
-
-        if (chart.config.type === "doughnut") {
-          const props = element.getProps(
-            [
-              "x",
-              "y",
-              "startAngle",
-              "endAngle",
-              "innerRadius",
-              "outerRadius",
-            ],
-            true
-          );
-
-          const angle = (props.startAngle + props.endAngle) / 2;
-          const radius = (props.innerRadius + props.outerRadius) / 2;
-
-          const x = props.x + Math.cos(angle) * radius;
-          const y = props.y + Math.sin(angle) * radius;
-
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = "#111827";
-          ctx.fillStyle = "#ffffff";
-
-          ctx.strokeText(value, x, y);
-          ctx.fillText(value, x, y);
-        }
-      });
-    });
-
-    ctx.restore();
-  },
-};
-
 ChartJS.register(
   BarElement,
   ArcElement,
   CategoryScale,
   LinearScale,
   Tooltip,
-  Legend,
-  valueLabelPlugin
+  Legend
 );
+
+const API_URL = (
+  import.meta.env.VITE_API_URL ||
+  "https://talentflow-backend-ohup.onrender.com"
+).replace(/\/$/, "");
 
 const ENTITIES = [
   "All Entities",
   "Nambiar Ensemble residential Projects LLP",
   "Sentrise Construction LLP",
   "Nambiar Builders Private Limited",
-  "Nambiar Builders LLP",
   "Nambiar Enterprises LLP",
- 
 ];
 
 const FUNCTIONS = [
@@ -126,7 +63,7 @@ const FUNCTIONS = [
   "HR",
   "Talent Acquisition",
   "Payroll",
-
+  "Facility Management",
 ];
 
 const TIME_FILTERS = [
@@ -146,101 +83,112 @@ export default function Dashboard() {
   const [selectedTime, setSelectedTime] = useState("All Time");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
-  const didLoad = useRef(false);
+
+  const cleanText = (value) => String(value || "").trim();
 
   const toNumber = (value) => {
     const num = Number(String(value || "0").replace(/,/g, ""));
     return Number.isNaN(num) ? 0 : num;
   };
 
-  const cleanText = (value) => String(value || "").trim();
-
   const normalizeEntity = (value) => {
     const text = cleanText(value);
-
     if (text.toLowerCase() === "sentries construction llp") {
       return "Sentrise Construction LLP";
     }
-
     return text;
   };
 
-  const getEntity = (item) => {
-    return (
-      normalizeEntity(item["Entity"]) ||
-      normalizeEntity(item["Entities"]) ||
-      normalizeEntity(item["Company"]) ||
-      normalizeEntity(item["Company Name"]) ||
-      normalizeEntity(item["Business Entity"]) ||
-      "Unknown"
+  const getEntity = (item) =>
+    normalizeEntity(item["Entity"]) ||
+    normalizeEntity(item["Entities"]) ||
+    normalizeEntity(item["Company"]) ||
+    normalizeEntity(item["Company Name"]) ||
+    normalizeEntity(item["Business Entity"]) ||
+    "Unknown";
+
+  const getFunction = (item) =>
+    cleanText(item["Function"] || item["Department"] || "Unknown");
+
+  const getTotal = (item) =>
+    toNumber(item["Total Positions"] || item["Total Position"] || item["Total"]);
+
+  const getClosed = (item) =>
+    toNumber(
+      item["Closed"] ||
+      item["Joined"] ||
+      item["Total Closed"] ||
+      item["Closed Positions"]
     );
-  };
+
+  const getYTJ = (item) =>
+    toNumber(item["Yet to join"] || item["Yet to Join"] || item["YTJ"]);
+
+  const getOpen = (item) =>
+    toNumber(item["Open Number"] || item["Open"] || item["Openings"]);
+
+  const getHold = (item) => toNumber(item["On Hold"] || item["Hold"]);
+
+  const getVendors = (item) =>
+    toNumber(item["Closed by vendors"] || item["Closed by Vendors"]);
+
+  const getInternal = (item) =>
+    toNumber(
+      item["Closed by Internal referral"] ||
+      item["Closed by Internal Referral"] ||
+      item["Internal Referral"]
+    );
+
+  const getTA = (item) =>
+    toNumber(item["Closed by TA Team"] || item["TA Team"]);
 
   const parseDate = (value) => {
     if (!value) return null;
 
-    const normalDate = new Date(value);
-
-    if (!Number.isNaN(normalDate.getTime())) {
-      return normalDate;
+    if (typeof value === "number") {
+      const d = new Date(Math.round((value - 25569) * 86400 * 1000));
+      return Number.isNaN(d.getTime()) ? null : d;
     }
 
-    if (typeof value === "string" && value.includes("-")) {
-      const parts = value.split("-");
+    const direct = new Date(value);
+    if (!Number.isNaN(direct.getTime())) return direct;
 
-      if (parts.length === 3) {
-        const [dd, mm, yyyy] = parts;
+    const text = cleanText(value);
+    const match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
 
-        const d = new Date(`${yyyy}-${mm}-${dd}`);
-
-        if (!Number.isNaN(d.getTime())) return d;
-      }
-    }
-
-    if (typeof value === "string" && value.includes("/")) {
-      const parts = value.split("/");
-
-      if (parts.length === 3) {
-        const [dd, mm, yyyy] = parts;
-
-        const d = new Date(`${yyyy}-${mm}-${dd}`);
-
-        if (!Number.isNaN(d.getTime())) return d;
-      }
+    if (match) {
+      const d = new Date(
+        Number(match[3]),
+        Number(match[2]) - 1,
+        Number(match[1])
+      );
+      return Number.isNaN(d.getTime()) ? null : d;
     }
 
     return null;
   };
 
-  const getRowDate = (item) => {
-    return (
-      parseDate(item["Date"]) ||
-      parseDate(item["Created Date"]) ||
-      parseDate(item["Created At"]) ||
-      parseDate(item["Requirement Date"]) ||
-      parseDate(item["Open Date"]) ||
-      parseDate(item["Joining Date"]) ||
-      parseDate(item["Joined Date"])
-    );
-  };
+  const getRowDate = (item) =>
+    parseDate(item["Date"]) ||
+    parseDate(item["Created Date"]) ||
+    parseDate(item["Created At"]) ||
+    parseDate(item["Requirement Date"]) ||
+    parseDate(item["Open Date"]) ||
+    parseDate(item["Joining Date"]) ||
+    parseDate(item["Joined Date"]);
 
   const startOfDay = (date) => {
     const d = new Date(date);
-
     d.setHours(0, 0, 0, 0);
-
     return d;
   };
 
   const endOfDay = (date) => {
     const d = new Date(date);
-
     d.setHours(23, 59, 59, 999);
-
     return d;
   };
 
@@ -248,12 +196,10 @@ export default function Dashboard() {
     if (selectedTime === "All Time") return true;
 
     const rowDate = getRowDate(item);
-
     if (!rowDate) return false;
 
     const today = new Date();
     const row = new Date(rowDate);
-
     let from = null;
     let to = null;
 
@@ -264,9 +210,7 @@ export default function Dashboard() {
 
     if (selectedTime === "Yesterday") {
       const y = new Date(today);
-
       y.setDate(y.getDate() - 1);
-
       from = startOfDay(y);
       to = endOfDay(y);
     }
@@ -275,7 +219,6 @@ export default function Dashboard() {
       const d = new Date(today);
       const day = d.getDay();
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-
       from = startOfDay(new Date(d.setDate(diff)));
       to = endOfDay(today);
     }
@@ -298,7 +241,6 @@ export default function Dashboard() {
 
     if (selectedTime === "Custom Range") {
       if (!customFrom || !customTo) return true;
-
       from = startOfDay(new Date(customFrom));
       to = endOfDay(new Date(customTo));
     }
@@ -312,10 +254,9 @@ export default function Dashboard() {
       setApiError("");
 
       const res = await fetch(`${API_URL}/api/sheets/dashboard`);
-
       const result = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || result.success === false) {
         setApiError(result.error || "Backend server error");
         setJobs([]);
         return;
@@ -332,24 +273,21 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (didLoad.current) return;
-
-    didLoad.current = true;
-
     loadDashboard();
   }, []);
 
   const filteredJobs = useMemo(() => {
-    let rows = jobs.filter((item) => item["Sl No."] !== "Total");
+    let rows = jobs.filter((item) => {
+      const slNo = cleanText(item["Sl No."]).toLowerCase();
+      return slNo !== "total" && slNo !== "grand total";
+    });
 
     if (selectedEntity !== "All Entities") {
       rows = rows.filter((item) => getEntity(item) === selectedEntity);
     }
 
     if (selectedFunction !== "All Functions") {
-      rows = rows.filter(
-        (item) => String(item["Function"] || "").trim() === selectedFunction
-      );
+      rows = rows.filter((item) => getFunction(item) === selectedFunction);
     }
 
     return rows.filter(isInsideTimeFilter);
@@ -365,78 +303,60 @@ export default function Dashboard() {
   const summary = useMemo(() => {
     return filteredJobs.reduce(
       (acc, item) => {
-        acc.total += toNumber(item["Total Positions"]);
-
-        acc.closed += toNumber(
-          item["Closed"] ||
-          item["Joined"] ||
-          item["Total Closed"] ||
-          item["Closed Positions"]
-        );
-
-        acc.ytj += toNumber(item["Yet to join"]);
-        acc.open += toNumber(item["Open Number"]);
-        acc.hold += toNumber(item["On Hold"]);
-        acc.closedByVendors += toNumber(item["Closed by vendors"]);
-
-        acc.closedByInternalReferral += toNumber(
-          item["Closed by Internal referral"]
-        );
-
-        acc.closedByTATeam += toNumber(item["Closed by TA Team"]);
-
-        const status = String(item["Status"] || "")
-          .trim()
-          .toLowerCase();
-
-        if (status.includes("offer accepted")) {
-          acc.accepted += toNumber(item["Yet to join"]) || 1;
-        }
-
+        acc.total += getTotal(item);
+        acc.closed += getClosed(item);
+        acc.ytj += getYTJ(item);
+        acc.open += getOpen(item);
+        acc.hold += getHold(item);
+        acc.vendors += getVendors(item);
+        acc.internal += getInternal(item);
+        acc.ta += getTA(item);
         return acc;
       },
       {
         total: 0,
         closed: 0,
-        accepted: 0,
         ytj: 0,
         open: 0,
         hold: 0,
-        closedByVendors: 0,
-        closedByInternalReferral: 0,
-        closedByTATeam: 0,
+        vendors: 0,
+        internal: 0,
+        ta: 0,
       }
     );
   }, [filteredJobs]);
 
-  const cards = [
-    ["Total Positions", summary.total, "From selected filters", "c1"],
-    ["Closed", summary.closed, "Live sheet count", "c2"],
-    ["Offer Accepted", summary.accepted, "Accepted candidates", "c3"],
-    ["Yet to Join", summary.ytj, "Pending joining", "c4"],
-    ["Open Number", summary.open, "Current openings", "c5"],
-    ["On Hold", summary.hold, "Hold positions", "c6"],
-    ["Closed by Vendors", summary.closedByVendors, "Vendor closed", "c7"],
-    [
-      "Closed by Internal referral",
-      summary.closedByInternalReferral,
-      "Internal referral closure",
-      "c8",
-    ],
-    ["Closed by TA Team", summary.closedByTATeam, "TA team closure", "c1"],
-  ];
-
-  const functionSummary = useMemo(() => {
+  const functionWiseSummary = useMemo(() => {
     const map = {};
 
     filteredJobs.forEach((item) => {
-      const fn = String(item["Function"] || "Unknown").trim();
+      const fn = getFunction(item);
 
-      map[fn] = (map[fn] || 0) + toNumber(item["Total Positions"]);
+      if (!map[fn]) {
+        map[fn] = {
+          total: 0,
+          closed: 0,
+          ytj: 0,
+          open: 0,
+          hold: 0,
+          vendors: 0,
+          internal: 0,
+          ta: 0,
+        };
+      }
+
+      map[fn].total += getTotal(item);
+      map[fn].closed += getClosed(item);
+      map[fn].ytj += getYTJ(item);
+      map[fn].open += getOpen(item);
+      map[fn].hold += getHold(item);
+      map[fn].vendors += getVendors(item);
+      map[fn].internal += getInternal(item);
+      map[fn].ta += getTA(item);
     });
 
     return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 10);
   }, [filteredJobs]);
 
@@ -445,221 +365,233 @@ export default function Dashboard() {
 
     filteredJobs.forEach((item) => {
       const entity = getEntity(item);
-
-      map[entity] = (map[entity] || 0) + toNumber(item["Total Positions"]);
+      map[entity] = (map[entity] || 0) + getTotal(item);
     });
 
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [filteredJobs]);
 
-  const barData = {
-    labels: functionSummary.map(([name]) => name),
+  const cards = [
+    ["Total Positions", summary.total, "From selected filters", "c1"],
+    ["Closed", summary.closed, "Completed positions", "c2"],
+    ["Yet to Join", summary.ytj, "Pending joining", "c3"],
+    ["Open Number", summary.open, "Current openings", "c4"],
+    ["On Hold", summary.hold, "Hold positions", "c5"],
+  ];
 
-    datasets: [
-      {
-        label: "Total Positions",
-        data: functionSummary.map(([, value]) => value),
-        backgroundColor: "#16a34a",
-        hoverBackgroundColor: "#16a34a",
-        borderRadius: 8,
-      },
-    ],
-  };
-
-  const entityBarData = {
-    labels: entitySummary.map(([name]) => name),
-
-    datasets: [
-      {
-        label: "Entity Positions",
-        data: entitySummary.map(([, value]) => value),
-        backgroundColor: "#22c55e",
-        hoverBackgroundColor: "#22c55e",
-        borderRadius: 8,
-      },
-    ],
-  };
-
-  const pieData = {
-    labels: [
-      "Closed",
-      "Yet to Join",
-      "Open",
-      "On Hold",
-      "Closed by Vendors",
-      "Internal Referral",
-      "TA Team",
-    ],
-
-    datasets: [
-      {
-        data: [
-          summary.closed,
-          summary.ytj,
-          summary.open,
-          summary.hold,
-          summary.closedByVendors,
-          summary.closedByInternalReferral,
-          summary.closedByTATeam,
-        ],
-
-        backgroundColor: [
-          "#22c55e",
-          "#f59e0b",
-          "#3b82f6",
-          "#f97316",
-          "#8b5cf6",
-          "#14b8a6",
-          "#ec4899",
-        ],
-
-        hoverBackgroundColor: [
-          "#22c55e",
-          "#f59e0b",
-          "#3b82f6",
-          "#f97316",
-          "#8b5cf6",
-          "#14b8a6",
-          "#ec4899",
-        ],
-
-        borderWidth: 0,
-        hoverOffset: 0,
-      },
-    ],
-  };
-
-  const commonOptions = {
+  const chartBaseOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    events: [],
-
+    animation: { duration: 0 },
     plugins: {
-      tooltip: {
-        enabled: false,
-      },
-
+      tooltip: { enabled: true },
       legend: {
         display: true,
+        labels: {
+          boxWidth: 10,
+          padding: 8,
+          font: { size: 10 },
+        },
       },
     },
-
-    animation: {
-      duration: 0,
-    },
-  };
-
-  const barOptions = {
-    ...commonOptions,
-
-    layout: {
-      padding: {
-        top: 28,
-      },
-    },
-
-    plugins: {
-      tooltip: {
-        enabled: false,
-      },
-
-      legend: {
-        display: false,
-      },
-    },
-
     scales: {
       x: {
-        ticks: {
-          font: {
-            size: 10,
-          },
-        },
-
-        grid: {
-          display: false,
-        },
+        grid: { display: false },
+        ticks: { font: { size: 9 } },
       },
-
       y: {
         beginAtZero: true,
-        grace: "15%",
-
-        ticks: {
-          precision: 0,
-
-          font: {
-            size: 10,
-          },
-        },
+        ticks: { precision: 0, font: { size: 9 } },
       },
     },
   };
 
-  const entityBarOptions = {
-    ...barOptions,
-
+  const horizontalOptions = {
+    ...chartBaseOptions,
     indexAxis: "y",
+  };
 
+  const stackedOptions = {
+    ...chartBaseOptions,
     scales: {
       x: {
-        beginAtZero: true,
-        grace: "15%",
-
-        ticks: {
-          precision: 0,
-          font: {
-            size: 10,
-          },
-        },
+        stacked: true,
+        grid: { display: false },
+        ticks: { font: { size: 9 } },
       },
-
       y: {
-        ticks: {
-          font: {
-            size: 10,
-          },
-        },
-
-        grid: {
-          display: false,
-        },
+        stacked: true,
+        beginAtZero: true,
+        ticks: { precision: 0, font: { size: 9 } },
       },
     },
   };
 
   const doughnutOptions = {
-    ...commonOptions,
-
+    responsive: true,
+    maintainAspectRatio: false,
     cutout: "68%",
-
     plugins: {
-      tooltip: {
-        enabled: false,
-      },
-
+      tooltip: { enabled: true },
       legend: {
         position: "bottom",
-
         labels: {
-          boxWidth: 12,
-          padding: 12,
-
-          font: {
-            size: 11,
-          },
+          boxWidth: 10,
+          padding: 8,
+          font: { size: 10 },
         },
       },
     },
   };
 
+  const functionStatusData = {
+    labels: functionWiseSummary.map(([name]) => name),
+    datasets: [
+      {
+        label: "Total Positions",
+        data: functionWiseSummary.map(([, v]) => v.total),
+        backgroundColor: "#16a34a",
+        borderRadius: 6,
+      },
+      {
+        label: "Closed",
+        data: functionWiseSummary.map(([, v]) => v.closed),
+        backgroundColor: "#2563eb",
+        borderRadius: 6,
+      },
+      {
+        label: "Open Number",
+        data: functionWiseSummary.map(([, v]) => v.open),
+        backgroundColor: "#f97316",
+        borderRadius: 6,
+      },
+    ],
+  };
+
+  const stackedStatusData = {
+    labels: functionWiseSummary.map(([name]) => name),
+    datasets: [
+      {
+        label: "Closed",
+        data: functionWiseSummary.map(([, v]) => v.closed),
+        backgroundColor: "#22c55e",
+      },
+      {
+        label: "Open Number",
+        data: functionWiseSummary.map(([, v]) => v.open),
+        backgroundColor: "#3b82f6",
+      },
+      {
+        label: "Yet to Join",
+        data: functionWiseSummary.map(([, v]) => v.ytj),
+        backgroundColor: "#f59e0b",
+      },
+      {
+        label: "On Hold",
+        data: functionWiseSummary.map(([, v]) => v.hold),
+        backgroundColor: "#ef4444",
+      },
+    ],
+  };
+
+  const closureSourceData = {
+    labels: functionWiseSummary.map(([name]) => name),
+    datasets: [
+      {
+        label: "Vendors",
+        data: functionWiseSummary.map(([, v]) => v.vendors),
+        backgroundColor: "#14b8a6",
+        borderRadius: 6,
+      },
+      {
+        label: "TA Team",
+        data: functionWiseSummary.map(([, v]) => v.ta),
+        backgroundColor: "#06b6d4",
+        borderRadius: 6,
+      },
+      {
+        label: "Internal",
+        data: functionWiseSummary.map(([, v]) => v.internal),
+        backgroundColor: "#ec4899",
+        borderRadius: 6,
+      },
+    ],
+  };
+
+  const openClosedData = {
+    labels: functionWiseSummary.map(([name]) => name),
+    datasets: [
+      {
+        label: "Closed",
+        data: functionWiseSummary.map(([, v]) => v.closed),
+        backgroundColor: "#16a34a",
+        borderRadius: 6,
+      },
+      {
+        label: "Open Number",
+        data: functionWiseSummary.map(([, v]) => v.open),
+        backgroundColor: "#f97316",
+        borderRadius: 6,
+      },
+    ],
+  };
+
+  const holdYTJData = {
+    labels: functionWiseSummary.map(([name]) => name),
+    datasets: [
+      {
+        label: "Yet to Join",
+        data: functionWiseSummary.map(([, v]) => v.ytj),
+        backgroundColor: "#eab308",
+        borderRadius: 6,
+      },
+      {
+        label: "On Hold",
+        data: functionWiseSummary.map(([, v]) => v.hold),
+        backgroundColor: "#8b5cf6",
+        borderRadius: 6,
+      },
+    ],
+  };
+
+  const entityData = {
+    labels: entitySummary.map(([name]) => name),
+    datasets: [
+      {
+        label: "Positions",
+        data: entitySummary.map(([, value]) => value),
+        backgroundColor: "#22c55e",
+        borderRadius: 6,
+      },
+    ],
+  };
+
+  const statusDoughnutData = {
+    labels: ["Closed", "Open Number", "Yet to Join", "On Hold"],
+    datasets: [
+      {
+        data: [summary.closed, summary.open, summary.ytj, summary.hold],
+        backgroundColor: ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444"],
+        borderWidth: 0,
+      },
+    ],
+  };
+
+  const closureDoughnutData = {
+    labels: ["Vendors", "TA Team", "Internal"],
+    datasets: [
+      {
+        data: [summary.vendors, summary.ta, summary.internal],
+        backgroundColor: ["#14b8a6", "#06b6d4", "#ec4899"],
+        borderWidth: 0,
+      },
+    ],
+  };
+
   return (
     <>
       <h1 className="page-title">NB Dashboard</h1>
-
-      <p className="page-subtitle">
-        Live recruitment dashboard connected with Google Sheets.
-      </p>
+      <p className="page-subtitle">Live recruitment dashboard.</p>
 
       <div className="filter-bar">
         <select
@@ -711,6 +643,7 @@ export default function Dashboard() {
               className="filter-select"
               type="date"
               value={customTo}
+              min={customFrom}
               onChange={(e) => setCustomTo(e.target.value)}
             />
           </>
@@ -724,8 +657,6 @@ export default function Dashboard() {
       {apiError && (
         <div style={styles.errorBox}>
           <strong>Backend Error:</strong> {apiError}
-          <br />
-          Check Render environment variables and Google Sheet permission.
         </div>
       )}
 
@@ -745,34 +676,51 @@ export default function Dashboard() {
             ))}
           </div>
 
-          <div style={styles.chartsGrid}>
-            <div style={styles.chartCard}>
-              <h3 style={styles.chartTitle}>Positions by Function</h3>
+          <div style={styles.compactGrid}>
+            <ChartCard title="Function: Total Positions / Closed / Open Number">
+              <Bar data={functionStatusData} options={chartBaseOptions} />
+            </ChartCard>
 
-              <div style={styles.barChartBox}>
-                <Bar data={barData} options={barOptions} />
-              </div>
-            </div>
+            <ChartCard title="Status Split">
+              <Doughnut data={statusDoughnutData} options={doughnutOptions} />
+            </ChartCard>
 
-            <div style={styles.chartCard}>
-              <h3 style={styles.chartTitle}>Status Breakdown</h3>
+            <ChartCard title="Function Stacked Status">
+              <Bar data={stackedStatusData} options={stackedOptions} />
+            </ChartCard>
 
-              <div style={styles.pieChartBox}>
-                <Doughnut data={pieData} options={doughnutOptions} />
-              </div>
-            </div>
-          </div>
+            <ChartCard title="Closure Source Split">
+              <Doughnut data={closureDoughnutData} options={doughnutOptions} />
+            </ChartCard>
 
-          <div style={styles.entityChartCard}>
-            <h3 style={styles.chartTitle}>Positions by Entity</h3>
+            <ChartCard title="Function Closure Source">
+              <Bar data={closureSourceData} options={chartBaseOptions} />
+            </ChartCard>
 
-            <div style={styles.entityChartBox}>
-              <Bar data={entityBarData} options={entityBarOptions} />
-            </div>
+            <ChartCard title="Open Number vs Closed">
+              <Bar data={openClosedData} options={horizontalOptions} />
+            </ChartCard>
+
+            <ChartCard title="Yet to Join vs On Hold">
+              <Bar data={holdYTJData} options={horizontalOptions} />
+            </ChartCard>
+
+            <ChartCard title="Entity Wise Positions">
+              <Bar data={entityData} options={horizontalOptions} />
+            </ChartCard>
           </div>
         </>
       )}
     </>
+  );
+}
+
+function ChartCard({ title, children }) {
+  return (
+    <div style={styles.chartCard}>
+      <h3 style={styles.chartTitle}>{title}</h3>
+      <div style={styles.chartBox}>{children}</div>
+    </div>
   );
 }
 
@@ -781,61 +729,38 @@ const styles = {
     background: "#fee2e2",
     color: "#991b1b",
     border: "1px solid #fecaca",
-    padding: "14px 16px",
+    padding: "12px 14px",
     borderRadius: "14px",
-    margin: "18px 0",
-    fontWeight: "600",
+    margin: "14px 0",
+    fontWeight: "700",
   },
 
-  chartsGrid: {
+  compactGrid: {
     display: "grid",
-    gridTemplateColumns: "1.35fr 0.85fr",
-    gap: "22px",
-    marginTop: "26px",
-    alignItems: "start",
+    gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+    gap: "16px",
+    marginTop: "20px",
   },
 
   chartCard: {
     background: "#ffffff",
-    borderRadius: "24px",
-    padding: "20px",
-    minHeight: "340px",
-    boxShadow: "0 4px 18px rgba(34,197,94,0.10)",
+    borderRadius: "18px",
+    padding: "14px",
+    minHeight: "300px",
+    boxShadow: "0 4px 14px rgba(34,197,94,0.10)",
     border: "1px solid #bbf7d0",
     boxSizing: "border-box",
-  },
-
-  entityChartCard: {
-    background: "#ffffff",
-    borderRadius: "24px",
-    padding: "20px",
-    height: "360px",
-    boxShadow: "0 4px 18px rgba(34,197,94,0.10)",
-    border: "1px solid #bbf7d0",
-    boxSizing: "border-box",
-    marginTop: "26px",
   },
 
   chartTitle: {
-    margin: "0 0 14px",
-    fontSize: "18px",
+    margin: "0 0 10px",
+    fontSize: "15px",
     fontWeight: "800",
     color: "#14532d",
   },
 
-  barChartBox: {
+  chartBox: {
     width: "100%",
-    height: "260px",
-  },
-
-  pieChartBox: {
-    width: "240px",
-    height: "240px",
-    margin: "0 auto",
-  },
-
-  entityChartBox: {
-    width: "100%",
-    height: "285px",
+    height: "245px",
   },
 };

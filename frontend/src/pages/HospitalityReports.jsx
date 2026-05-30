@@ -1,30 +1,31 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const API_BASE =
   import.meta.env.VITE_API_URL ||
-  "https://talentflow-hr-website-1jga.onrender.com";
+  "https://talentflow-backend-ohup.onrender.com";
+
+const ROWS_PER_PAGE = 10;
 
 export default function HospitalityReports() {
   const [rows, setRows] = useState([]);
-  const didLoad = useRef(false);
   const [search, setSearch] = useState("");
-  const [selectedFunction, setSelectedFunction] =
-    useState("All Functions");
+  const [selectedFunction, setSelectedFunction] = useState("All Functions");
   const [timeFilter, setTimeFilter] = useState("All Time");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [showDashboard, setShowDashboard] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadReports = async () => {
     try {
       setLoading(true);
 
-      const res = await fetch(
-        `${API_BASE}/api/hospitality/dashboard`
-      );
-
+      const res = await fetch(`${API_BASE}/api/hospitality/dashboard`);
       const result = await res.json();
 
       setRows(Array.isArray(result.data) ? result.data : []);
+      setCurrentPage(1);
     } catch (error) {
       console.log("HOSPITALITY REPORTS ERROR:", error);
       setRows([]);
@@ -34,19 +35,11 @@ export default function HospitalityReports() {
   };
 
   useEffect(() => {
-    if (didLoad.current) return;
-
-    didLoad.current = true;
-
     loadReports();
   }, []);
 
   const getFunctionName = (item) =>
-    String(
-      item["Function"] ||
-      item["Department"] ||
-      "Unknown"
-    ).trim();
+    String(item["Function"] || item["Department"] || "Unknown").trim();
 
   const getDateValue = (item) => {
     const value =
@@ -60,98 +53,106 @@ export default function HospitalityReports() {
     if (!value) return null;
 
     const d = new Date(value);
-
     return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const getDateOnly = (date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
   };
 
   const functions = useMemo(() => {
     const list = rows.map(getFunctionName).filter(Boolean);
-
     return ["All Functions", ...new Set(list)];
   }, [rows]);
 
   const columns = useMemo(() => {
     if (!rows.length) return [];
-
     return Object.keys(rows[0]);
   }, [rows]);
 
   const filteredRows = useMemo(() => {
-    const now = new Date();
+    const now = getDateOnly(new Date());
 
     return rows.filter((item) => {
       const fn = getFunctionName(item);
 
       const matchesFunction =
-        selectedFunction === "All Functions" ||
-        fn === selectedFunction;
+        selectedFunction === "All Functions" || fn === selectedFunction;
 
-      const text = Object.values(item)
-        .join(" ")
-        .toLowerCase();
-
-      const matchesSearch = text.includes(
-        search.toLowerCase()
-      );
+      const text = Object.values(item).join(" ").toLowerCase();
+      const matchesSearch = text.includes(search.toLowerCase());
 
       let matchesTime = true;
 
       if (timeFilter !== "All Time") {
         const d = getDateValue(item);
-
         if (!d) return false;
 
-        const diffDays = Math.floor(
-          (now - d) / (1000 * 60 * 60 * 24)
-        );
+        const rowDate = getDateOnly(d);
 
-        if (timeFilter === "Today")
-          matchesTime = diffDays === 0;
+        if (timeFilter === "Custom Range") {
+          if (!fromDate || !toDate) {
+            matchesTime = true;
+          } else {
+            const from = getDateOnly(new Date(fromDate));
+            const to = getDateOnly(new Date(toDate));
+            matchesTime = rowDate >= from && rowDate <= to;
+          }
+        }
 
-        if (timeFilter === "Last 7 Days")
-          matchesTime = diffDays <= 7;
+        if (timeFilter === "Today") {
+          matchesTime = rowDate.getTime() === now.getTime();
+        }
 
-        if (timeFilter === "Last 30 Days")
-          matchesTime = diffDays <= 30;
+        if (timeFilter === "Last 7 Days") {
+          const diffDays = Math.floor((now - rowDate) / (1000 * 60 * 60 * 24));
+          matchesTime = diffDays >= 0 && diffDays <= 7;
+        }
 
-        if (timeFilter === "This Year")
-          matchesTime =
-            d.getFullYear() === now.getFullYear();
+        if (timeFilter === "Last 30 Days") {
+          const diffDays = Math.floor((now - rowDate) / (1000 * 60 * 60 * 24));
+          matchesTime = diffDays >= 0 && diffDays <= 30;
+        }
+
+        if (timeFilter === "This Year") {
+          matchesTime = rowDate.getFullYear() === now.getFullYear();
+        }
       }
 
-      return (
-        matchesFunction &&
-        matchesSearch &&
-        matchesTime
-      );
+      return matchesFunction && matchesSearch && matchesTime;
     });
-  }, [rows, selectedFunction, search, timeFilter]);
+  }, [rows, selectedFunction, search, timeFilter, fromDate, toDate]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedFunction, timeFilter, fromDate, toDate]);
+
+  const totalPages = Math.ceil(filteredRows.length / ROWS_PER_PAGE) || 1;
+
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
+    return filteredRows.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  }, [filteredRows, currentPage]);
 
   const dashboardData = useMemo(() => {
     const counts = {};
 
     filteredRows.forEach((item) => {
       const fn = getFunctionName(item);
-
       counts[fn] = (counts[fn] || 0) + 1;
     });
 
     return Object.entries(counts)
-      .map(([name, count]) => ({
-        name,
-        count,
-      }))
+      .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count);
   }, [filteredRows]);
 
   const totalRecords = filteredRows.length;
   const totalFunctions = dashboardData.length;
   const topFunction = dashboardData[0]?.name || "-";
-
-  const maxCount = Math.max(
-    ...dashboardData.map((i) => i.count),
-    1
-  );
+  const maxCount = Math.max(...dashboardData.map((i) => i.count), 1);
 
   const exportCSV = () => {
     if (!filteredRows.length) {
@@ -160,28 +161,22 @@ export default function HospitalityReports() {
     }
 
     const csvRows = [];
-
     csvRows.push(columns.join(","));
 
     filteredRows.forEach((row) => {
       const values = columns.map((col) => {
         const value = row[col] ?? "";
-
         return `"${String(value).replace(/"/g, '""')}"`;
       });
 
       csvRows.push(values.join(","));
     });
 
-    const blob = new Blob(
-      [csvRows.join("\n")],
-      {
-        type: "text/csv;charset=utf-8;",
-      }
-    );
+    const blob = new Blob([csvRows.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
 
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
 
     link.href = url;
@@ -193,13 +188,10 @@ export default function HospitalityReports() {
 
   return (
     <>
-      <h1 className="page-title">
-        Hospitality Reports
-      </h1>
+      <h1 className="page-title">Hospitality Reports</h1>
 
       <p className="page-subtitle">
-        Live hospitality reports connected with
-        Google Sheets.
+        Live hospitality reports connected with Google Sheets.
       </p>
 
       <div style={styles.filterBar}>
@@ -208,17 +200,13 @@ export default function HospitalityReports() {
           type="text"
           placeholder="Search hospitality reports..."
           value={search}
-          onChange={(e) =>
-            setSearch(e.target.value)
-          }
+          onChange={(e) => setSearch(e.target.value)}
         />
 
         <select
           style={styles.select}
           value={selectedFunction}
-          onChange={(e) =>
-            setSelectedFunction(e.target.value)
-          }
+          onChange={(e) => setSelectedFunction(e.target.value)}
         >
           {functions.map((item) => (
             <option key={item} value={item}>
@@ -230,37 +218,51 @@ export default function HospitalityReports() {
         <select
           style={styles.select}
           value={timeFilter}
-          onChange={(e) =>
-            setTimeFilter(e.target.value)
-          }
+          onChange={(e) => {
+            setTimeFilter(e.target.value);
+
+            if (e.target.value !== "Custom Range") {
+              setFromDate("");
+              setToDate("");
+            }
+          }}
         >
           <option>All Time</option>
+          <option>Custom Range</option>
           <option>Today</option>
           <option>Last 7 Days</option>
           <option>Last 30 Days</option>
           <option>This Year</option>
         </select>
 
-        <button
-          style={styles.primaryBtn}
-          onClick={() =>
-            setShowDashboard(true)
-          }
-        >
+        {timeFilter === "Custom Range" && (
+          <>
+            <input
+              style={styles.select}
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+
+            <input
+              style={styles.select}
+              type="date"
+              value={toDate}
+              min={fromDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
+          </>
+        )}
+
+        <button style={styles.primaryBtn} onClick={() => setShowDashboard(true)}>
           Open Dashboard
         </button>
 
-        <button
-          style={styles.greenBtn}
-          onClick={exportCSV}
-        >
+        <button style={styles.greenBtn} onClick={exportCSV}>
           Export CSV
         </button>
 
-        <button
-          style={styles.secondaryBtn}
-          onClick={loadReports}
-        >
+        <button style={styles.secondaryBtn} onClick={loadReports}>
           Refresh
         </button>
       </div>
@@ -269,95 +271,57 @@ export default function HospitalityReports() {
         <div style={styles.dashboard}>
           <div style={styles.dashboardHeader}>
             <div>
-              <h2 style={styles.sectionTitle}>
-                Hospitality Dashboard
-              </h2>
-
+              <h2 style={styles.sectionTitle}>Hospitality Dashboard</h2>
               <p style={styles.smallText}>
-                Function wise live dashboard
-                based on selected filters.
+                Function wise live dashboard based on selected filters.
               </p>
             </div>
 
-            <button
-              style={styles.closeBtn}
-              onClick={() =>
-                setShowDashboard(false)
-              }
-            >
+            <button style={styles.closeBtn} onClick={() => setShowDashboard(false)}>
               Close Dashboard
             </button>
           </div>
 
           <div style={styles.statsGrid}>
             <div style={styles.statCard}>
-              <p style={styles.statLabel}>
-                Total Records
-              </p>
-
-              <h2 style={styles.statValue}>
-                {totalRecords}
-              </h2>
+              <p style={styles.statLabel}>Total Records</p>
+              <h2 style={styles.statValue}>{totalRecords}</h2>
             </div>
 
             <div style={styles.statCard}>
-              <p style={styles.statLabel}>
-                Total Functions
-              </p>
-
-              <h2 style={styles.statValue}>
-                {totalFunctions}
-              </h2>
+              <p style={styles.statLabel}>Total Functions</p>
+              <h2 style={styles.statValue}>{totalFunctions}</h2>
             </div>
 
             <div style={styles.statCard}>
-              <p style={styles.statLabel}>
-                Top Function
-              </p>
-
-              <h2 style={styles.statValueSmall}>
-                {topFunction}
-              </h2>
+              <p style={styles.statLabel}>Top Function</p>
+              <h2 style={styles.statValueSmall}>{topFunction}</h2>
             </div>
           </div>
 
           <div style={styles.chartGrid}>
             <div style={styles.chartCard}>
-              <h3 style={styles.chartTitle}>
-                Function Wise Bar Chart
-              </h3>
+              <h3 style={styles.chartTitle}>Function Wise Bar Chart</h3>
 
               {dashboardData.length ? (
                 dashboardData.map((item) => (
-                  <div
-                    key={item.name}
-                    style={styles.barRow}
-                  >
-                    <div style={styles.barLabel}>
-                      {item.name}
-                    </div>
+                  <div key={item.name} style={styles.barRow}>
+                    <div style={styles.barLabel}>{item.name}</div>
 
                     <div style={styles.barTrack}>
                       <div
                         style={{
                           ...styles.barFill,
-                          width: `${(item.count /
-                            maxCount) *
-                            100
-                            }%`,
+                          width: `${(item.count / maxCount) * 100}%`,
                         }}
                       />
                     </div>
 
-                    <div style={styles.barCount}>
-                      {item.count}
-                    </div>
+                    <div style={styles.barCount}>{item.count}</div>
                   </div>
                 ))
               ) : (
-                <p style={styles.emptyText}>
-                  No dashboard data found.
-                </p>
+                <p style={styles.emptyText}>No dashboard data found.</p>
               )}
             </div>
           </div>
@@ -369,12 +333,10 @@ export default function HospitalityReports() {
       ) : (
         <div style={styles.reportCard}>
           <div style={styles.reportHeader}>
-            <h2 style={styles.reportTitle}>
-              Hospitality Report Data
-            </h2>
+            <h2 style={styles.reportTitle}>Hospitality Report Data</h2>
 
             <span style={styles.countBadge}>
-              {filteredRows.length} Records
+              Showing {paginatedRows.length} of {filteredRows.length} Records
             </span>
           </div>
 
@@ -383,10 +345,7 @@ export default function HospitalityReports() {
               <thead>
                 <tr>
                   {columns.map((column) => (
-                    <th
-                      key={column}
-                      style={styles.th}
-                    >
+                    <th key={column} style={styles.th}>
                       {column}
                     </th>
                   ))}
@@ -394,40 +353,59 @@ export default function HospitalityReports() {
               </thead>
 
               <tbody>
-                {filteredRows.length > 0 ? (
-                  filteredRows.map(
-                    (row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {columns.map(
-                          (column) => (
-                            <td
-                              key={column}
-                              style={styles.td}
-                            >
-                              {row[column] ||
-                                "-"}
-                            </td>
-                          )
-                        )}
-                      </tr>
-                    )
-                  )
+                {paginatedRows.length > 0 ? (
+                  paginatedRows.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      {columns.map((column) => (
+                        <td key={column} style={styles.td}>
+                          {row[column] || "-"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={
-                        columns.length || 1
-                      }
-                      style={styles.emptyCell}
-                    >
-                      No hospitality report
-                      data found.
+                    <td colSpan={columns.length || 1} style={styles.emptyCell}>
+                      No hospitality report data found.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+
+          {filteredRows.length > ROWS_PER_PAGE && (
+            <div style={styles.pagination}>
+              <button
+                style={{
+                  ...styles.pageBtn,
+                  opacity: currentPage === 1 ? 0.5 : 1,
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                }}
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((page) => page - 1)}
+              >
+                Previous
+              </button>
+
+              <span style={styles.pageInfo}>
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                style={{
+                  ...styles.pageBtn,
+                  opacity: currentPage === totalPages ? 0.5 : 1,
+                  cursor:
+                    currentPage === totalPages ? "not-allowed" : "pointer",
+                }}
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((page) => page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -492,6 +470,28 @@ const styles = {
     cursor: "pointer",
   },
 
+  pageBtn: {
+    border: "none",
+    background: "#2563eb",
+    color: "#ffffff",
+    padding: "10px 16px",
+    borderRadius: "10px",
+    fontWeight: "800",
+  },
+
+  pagination: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "14px",
+    marginTop: "18px",
+  },
+
+  pageInfo: {
+    fontWeight: "800",
+    color: "#374151",
+  },
+
   dashboard: {
     background: "#f8fafc",
     border: "1px solid #e5e7eb",
@@ -532,8 +532,7 @@ const styles = {
 
   statsGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(220px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "16px",
     marginBottom: "20px",
   },
@@ -542,8 +541,7 @@ const styles = {
     background: "#ffffff",
     borderRadius: "20px",
     padding: "20px",
-    boxShadow:
-      "0 4px 16px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
   },
 
   statLabel: {
@@ -567,8 +565,7 @@ const styles = {
 
   chartGrid: {
     display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(320px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
     gap: "18px",
   },
 
@@ -576,8 +573,7 @@ const styles = {
     background: "#ffffff",
     borderRadius: "20px",
     padding: "20px",
-    boxShadow:
-      "0 4px 16px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
   },
 
   chartTitle: {
@@ -588,8 +584,7 @@ const styles = {
 
   barRow: {
     display: "grid",
-    gridTemplateColumns:
-      "140px 1fr 50px",
+    gridTemplateColumns: "140px 1fr 50px",
     gap: "12px",
     alignItems: "center",
     marginBottom: "14px",
@@ -613,8 +608,7 @@ const styles = {
 
   barFill: {
     height: "100%",
-    background:
-      "linear-gradient(90deg, #2563eb, #16a34a)",
+    background: "linear-gradient(90deg, #2563eb, #16a34a)",
     borderRadius: "999px",
   },
 
@@ -633,8 +627,7 @@ const styles = {
     background: "#ffffff",
     borderRadius: "24px",
     padding: "24px",
-    boxShadow:
-      "0 4px 18px rgba(0,0,0,0.06)",
+    boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
   },
 
   reportHeader: {

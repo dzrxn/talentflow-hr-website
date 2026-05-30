@@ -13,7 +13,7 @@ function cleanEndpoint(endpoint = "") {
   value = value.replace(API_URL, "");
   value = value.replace("http://localhost:5000", "");
   value = value.replace("https://talentflow-hr-website-m3yb.onrender.com", "");
-  value = value.replace("https://talentflow-hr-website-1jga.onrender.com", "");
+  value = value.replace("https://talentflow-backend-ohup.onrender.com", "");
 
   value = value.replace(/\/api\/sheets\/\/api\/sheets/g, "/api/sheets");
   value = value.replace(/\/api\/sheets\/http:\/\/localhost:5000/g, "");
@@ -35,7 +35,7 @@ async function fetchAPI(endpoint) {
 
 
   const res = await fetch(
-    "https://talentflow-hr-website-1jga.onrender.com/api/sheets/dashboard"
+    "https://talentflow-backend-ohup.onrender.com/api/sheets/dashboard"
   );
 
   const API_URL =

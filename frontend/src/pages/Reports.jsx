@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bar, Doughnut } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -24,6 +24,8 @@ const API_BASE = (
   "https://talentflow-hr-website-m3yb.onrender.com"
 ).replace(/\/$/, "");
 
+const ROWS_PER_PAGE = 10;
+
 const DASHBOARD_FILTERS = [
   "All Dashboard",
   "Total Positions",
@@ -38,6 +40,7 @@ const DASHBOARD_FILTERS = [
 
 const TIME_FILTERS = [
   "All Time",
+  "Custom Range",
   "Today",
   "Yesterday",
   "This Week",
@@ -46,23 +49,27 @@ const TIME_FILTERS = [
   "This Year",
 ];
 
+const WORKFORCE_OPTIONS = ["All Workforce", "Blue-collar workforce"];
 const REMOVED_ENTITIES = ["chalukya samrat"];
+const EXTRA_FUNCTIONS = ["HR", "Payroll", "Facility Management"];
 
 export default function Reports() {
   const [jobs, setJobs] = useState([]);
-  const didLoad = useRef(false);
   const [selectedFunction, setSelectedFunction] = useState("All Functions");
   const [selectedEntity, setSelectedEntity] = useState("All Entities");
+  const [selectedWorkforce, setSelectedWorkforce] = useState("All Workforce");
   const [selectedDashboard, setSelectedDashboard] = useState("All Dashboard");
   const [selectedTime, setSelectedTime] = useState("All Time");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [showDashboard, setShowDashboard] = useState(false);
   const [maximizedChart, setMaximizedChart] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const clean = (value) => String(value ?? "").trim();
-
   const normalize = (value) => clean(value).toLowerCase().replace(/\s+/g, " ");
 
   const toNumber = (value) => {
@@ -78,42 +85,41 @@ export default function Reports() {
   };
 
   const getSlNo = (item) => getValue(item, ["Sl No.", "Sl No", "S No"]);
-
   const getDesignation = (item) =>
     clean(getValue(item, ["Designation", "Role", "Position"]));
-
   const getFunction = (item) =>
     clean(getValue(item, ["Function", "Department", "FUNCTION"]));
-
+  const getWorkforce = (item) =>
+    clean(
+      getValue(item, [
+        "Workforce",
+        "Work Force",
+        "Workforce Type",
+        "Work Force Type",
+        "Category",
+        "Hiring Category",
+        "Employee Category",
+      ])
+    );
   const getEntity = (item) => clean(getValue(item, ["Entity", "ENTITY"]));
-
   const getStatus = (item) => clean(getValue(item, ["Status", "STATUS"]));
-
   const getCreatedDate = (item) =>
     getValue(item, ["Created Date", "CreatedAt", "Date", "Opening Date"]);
-
   const getClosedDate = (item) =>
     getValue(item, ["Closed Date", "ClosedAt", "Closing Date"]);
 
   const getTotalPositions = (item) =>
     toNumber(getValue(item, ["Total Positions", "Total Position", "Total"]));
-
   const getJoined = (item) => toNumber(getValue(item, ["Joined"]));
-
   const getYTJ = (item) =>
     toNumber(getValue(item, ["Yet to join", "Yet to Join", "YTJ"]));
-
   const getOpen = (item) =>
     toNumber(getValue(item, ["Open Number", "Open", "Openings"]));
-
   const getHold = (item) => toNumber(getValue(item, ["On Hold", "Hold"]));
-
   const getVendors = (item) =>
     toNumber(getValue(item, ["Closed by vendors", "Closed by Vendors"]));
-
   const getTA = (item) =>
     toNumber(getValue(item, ["Closed by TA Team", "TA Team"]));
-
   const getInternal = (item) =>
     toNumber(
       getValue(item, [
@@ -126,6 +132,24 @@ export default function Reports() {
   const isRemovedEntity = (entity) => {
     const value = normalize(entity);
     return REMOVED_ENTITIES.some((removed) => value.includes(removed));
+  };
+
+  const isBlueCollarRow = (item) => {
+    const text = [
+      getWorkforce(item),
+      getFunction(item),
+      getDesignation(item),
+      getStatus(item),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return (
+      text.includes("blue-collar workforce") ||
+      text.includes("blue collar workforce") ||
+      text.includes("blue-collar") ||
+      text.includes("blue collar")
+    );
   };
 
   const parseDate = (value) => {
@@ -152,6 +176,12 @@ export default function Reports() {
     return Number.isNaN(date.getTime()) ? null : date;
   };
 
+  const startOfDay = (date) => {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
   const formatDate = (value) => {
     const date = parseDate(value);
     if (!date) return clean(value);
@@ -161,19 +191,25 @@ export default function Reports() {
   const isWithinTime = (createdDate, closedDate) => {
     if (selectedTime === "All Time") return true;
 
-    const dates = [parseDate(createdDate), parseDate(closedDate)].filter(
-      Boolean
-    );
-
+    const dates = [parseDate(createdDate), parseDate(closedDate)].filter(Boolean);
     if (dates.length === 0) return false;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    if (selectedTime === "Custom Range") {
+      if (!fromDate || !toDate) return true;
+
+      const from = startOfDay(new Date(fromDate));
+      const to = startOfDay(new Date(toDate));
+
+      return dates.some((date) => {
+        const d = startOfDay(date);
+        return d >= from && d <= to;
+      });
+    }
+
+    const today = startOfDay(new Date());
 
     return dates.some((date) => {
-      const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-
+      const d = startOfDay(date);
       const diffDays = Math.floor((today - d) / (1000 * 60 * 60 * 24));
 
       if (selectedTime === "Today") return diffDays === 0;
@@ -209,6 +245,7 @@ export default function Reports() {
       const text = [
         getDesignation(item),
         getFunction(item),
+        getWorkforce(item),
         entity,
         getStatus(item),
       ]
@@ -222,6 +259,7 @@ export default function Reports() {
       return (
         getDesignation(item) ||
         getFunction(item) ||
+        getWorkforce(item) ||
         entity ||
         getStatus(item) ||
         getTotalPositions(item) > 0 ||
@@ -238,16 +276,9 @@ export default function Reports() {
       setLoading(true);
       setErrorMsg("");
 
-
       const res = await fetch(`${API_BASE}/api/sheets/dashboard`, {
         headers: { Accept: "application/json" },
       });
-
-      const urls = [`${API_BASE}/api/sheets/reports`, `${API_BASE}/api/sheets/dashboard`];
-
-
-
-
 
       const text = await res.text();
       let result = {};
@@ -264,6 +295,7 @@ export default function Reports() {
 
       const rows = removeBadRows(extractRows(result));
       setJobs(rows);
+      setCurrentPage(1);
 
       if (rows.length === 0) {
         setErrorMsg("No Nambiar Builders dashboard data found.");
@@ -278,16 +310,16 @@ export default function Reports() {
   };
 
   useEffect(() => {
-    if (didLoad.current) return;
-
-    didLoad.current = true;
-
     loadReports();
   }, []);
 
   const functions = useMemo(() => {
-    const list = jobs.map(getFunction).filter(Boolean);
-    return ["All Functions", ...Array.from(new Set(list)).sort()];
+    const backendFunctions = jobs.map(getFunction).filter(Boolean);
+    const uniqueFunctions = Array.from(
+      new Set([...backendFunctions, ...EXTRA_FUNCTIONS])
+    ).sort((a, b) => a.localeCompare(b));
+
+    return ["All Functions", ...uniqueFunctions];
   }, [jobs]);
 
   const entities = useMemo(() => {
@@ -310,6 +342,10 @@ export default function Reports() {
 
     if (selectedEntity !== "All Entities") {
       rows = rows.filter((item) => getEntity(item) === selectedEntity);
+    }
+
+    if (selectedWorkforce === "Blue-collar workforce") {
+      rows = rows.filter((item) => isBlueCollarRow(item));
     }
 
     rows = rows.filter((item) =>
@@ -341,6 +377,7 @@ export default function Reports() {
           getSlNo(item),
           getDesignation(item),
           getFunction(item),
+          getWorkforce(item),
           getEntity(item),
           getStatus(item),
           getCreatedDate(item),
@@ -357,10 +394,33 @@ export default function Reports() {
     jobs,
     selectedFunction,
     selectedEntity,
+    selectedWorkforce,
     selectedDashboard,
     selectedTime,
+    fromDate,
+    toDate,
     searchText,
   ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    selectedFunction,
+    selectedEntity,
+    selectedWorkforce,
+    selectedDashboard,
+    selectedTime,
+    fromDate,
+    toDate,
+    searchText,
+  ]);
+
+  const totalPages = Math.ceil(filteredJobs.length / ROWS_PER_PAGE) || 1;
+
+  const paginatedJobs = useMemo(() => {
+    const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
+    return filteredJobs.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  }, [filteredJobs, currentPage]);
 
   const summary = useMemo(() => {
     return filteredJobs.reduce(
@@ -409,16 +469,7 @@ export default function Reports() {
   };
 
   const statusBarData = {
-    labels: [
-      "Total",
-      "Joined",
-      "YTJ",
-      "Open",
-      "On Hold",
-      "Vendors",
-      "TA Team",
-      "Internal",
-    ],
+    labels: ["Total", "Joined", "YTJ", "Open", "On Hold", "Vendors", "TA Team", "Internal"],
     datasets: [
       {
         label: "Count",
@@ -491,6 +542,7 @@ export default function Reports() {
         "Sl No.",
         "Designation",
         "Function",
+        "Workforce",
         "Entity",
         "Created Date",
         "Closed Date",
@@ -508,6 +560,7 @@ export default function Reports() {
         getSlNo(r),
         getDesignation(r),
         getFunction(r),
+        getWorkforce(r),
         getEntity(r),
         formatDate(getCreatedDate(r)),
         formatDate(getClosedDate(r)),
@@ -584,6 +637,18 @@ export default function Reports() {
 
         <select
           className="filter-select"
+          value={selectedWorkforce}
+          onChange={(e) => setSelectedWorkforce(e.target.value)}
+        >
+          {WORKFORCE_OPTIONS.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="filter-select"
           value={selectedEntity}
           onChange={(e) => setSelectedEntity(e.target.value)}
         >
@@ -617,6 +682,25 @@ export default function Reports() {
             </option>
           ))}
         </select>
+
+        {selectedTime === "Custom Range" && (
+          <>
+            <input
+              className="filter-select"
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+
+            <input
+              className="filter-select"
+              type="date"
+              value={toDate}
+              min={fromDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
+          </>
+        )}
 
         <input
           className="filter-select"
@@ -703,11 +787,7 @@ export default function Reports() {
         >
           <div
             className="chart-card"
-            style={{
-              height: "90vh",
-              width: "100%",
-              overflow: "auto",
-            }}
+            style={{ height: "90vh", width: "100%", overflow: "auto" }}
           >
             <div className="table-header">
               <h3>
@@ -732,7 +812,9 @@ export default function Reports() {
       <div className="reports-table">
         <div className="table-header">
           <h3>Nambiar Builders Recruitment Reports</h3>
-          <span>{filteredJobs.length} Records</span>
+          <span>
+            Showing {paginatedJobs.length} of {filteredJobs.length} Records
+          </span>
         </div>
 
         <div className="table-scroll">
@@ -742,6 +824,7 @@ export default function Reports() {
                 <th>Sl No.</th>
                 <th>Designation</th>
                 <th>Function</th>
+                <th>Workforce</th>
                 <th>Entity</th>
                 <th>Created Date</th>
                 <th>Closed Date</th>
@@ -760,24 +843,25 @@ export default function Reports() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="15" style={{ textAlign: "center" }}>
+                  <td colSpan="16" style={{ textAlign: "center" }}>
                     Loading...
                   </td>
                 </tr>
-              ) : filteredJobs.length === 0 ? (
+              ) : paginatedJobs.length === 0 ? (
                 <tr>
-                  <td colSpan="15" style={{ textAlign: "center" }}>
+                  <td colSpan="16" style={{ textAlign: "center" }}>
                     No data found
                   </td>
                 </tr>
               ) : (
-                filteredJobs.map((r, index) => (
+                paginatedJobs.map((r, index) => (
                   <tr key={index}>
                     <td>{getSlNo(r)}</td>
                     <td>
                       <strong>{getDesignation(r)}</strong>
                     </td>
                     <td>{getFunction(r)}</td>
+                    <td>{getWorkforce(r)}</td>
                     <td>{getEntity(r)}</td>
                     <td>{formatDate(getCreatedDate(r))}</td>
                     <td>{formatDate(getClosedDate(r))}</td>
@@ -796,7 +880,62 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
+
+        {filteredJobs.length > ROWS_PER_PAGE && (
+          <div style={paginationStyles.wrapper}>
+            <button
+              style={{
+                ...paginationStyles.button,
+                opacity: currentPage === 1 ? 0.5 : 1,
+                cursor: currentPage === 1 ? "not-allowed" : "pointer",
+              }}
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((page) => page - 1)}
+            >
+              Previous
+            </button>
+
+            <span style={paginationStyles.info}>
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              style={{
+                ...paginationStyles.button,
+                opacity: currentPage === totalPages ? 0.5 : 1,
+                cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+              }}
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((page) => page + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </>
   );
 }
+
+const paginationStyles = {
+  wrapper: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "14px",
+    marginTop: "18px",
+    paddingBottom: "8px",
+  },
+  button: {
+    border: "none",
+    background: "#2563eb",
+    color: "#ffffff",
+    padding: "10px 18px",
+    borderRadius: "10px",
+    fontWeight: "800",
+  },
+  info: {
+    fontWeight: "800",
+    color: "#374151",
+  },
+};

@@ -10,6 +10,7 @@ import HospitalityReports from "./pages/HospitalityReports";
 import SubmissionData from "./pages/SubmissionData";
 import InternshipData from "./pages/InternshipData";
 import OffersData from "./pages/OffersData";
+import BGVDashboard from "./pages/BGVDashboard";
 
 import "./index.css";
 
@@ -39,6 +40,9 @@ export default function App() {
       case "dashboard":
       default:
         return <Dashboard />;
+
+      case "bgv-dashboard":
+        return <BGVDashboard />;
     }
   };
 

@@ -46,6 +46,13 @@ export default function Sidebar({ page, setPage }) {
       icon: "▤",
       label: "Hospitality Reports",
     },
+
+    {
+      id: "bgv-dashboard",
+      icon: "▦",
+      label: "BGVDashboard",
+    },
+
   ];
 
   return (

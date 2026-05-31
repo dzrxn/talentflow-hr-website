@@ -200,6 +200,7 @@ router.get("/", (req, res) => {
       offers: "/api/sheets/offers",
       allData: "/api/sheets/all-data",
       tabs: "/api/sheets/tabs",
+      bgv: "/api/sheets/bgv",
     },
   });
 });
@@ -387,6 +388,36 @@ router.get("/offers", async (req, res) => {
     res.status(500).json({
       success: false,
       route: "/api/sheets/offers",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/bgv", async (req, res) => {
+  try {
+    const sheetId = process.env.BGV_SHEET_ID;
+
+    const result = await readSheet({
+      spreadsheetId: sheetId,
+      ranges: [
+        process.env.BGV_RANGE,
+        ...makeRanges([
+          "BGV Data",
+          "BGV Dashboard",
+        ]),
+      ],
+    });
+
+    res.json({
+      success: true,
+      type: "bgv",
+      sheetId,
+      ...result,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      route: "/api/sheets/bgv",
       error: error.message,
     });
   }

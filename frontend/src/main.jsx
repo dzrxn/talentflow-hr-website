@@ -7,6 +7,7 @@ import "./styles/auth.css";
 import "./styles/layout.css";
 import "./styles/dashboard.css";
 import "./styles/reports.css";
+import BGVDashboard from "./pages/BGVDashboard";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
 

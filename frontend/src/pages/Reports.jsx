@@ -21,7 +21,7 @@ ChartJS.register(
 
 const API_BASE = (
   import.meta.env.VITE_API_URL ||
-  "https://talentflow-hr-website-m3yb.onrender.com"
+  "https://talentflow-backend-ohup.onrender.com"
 ).replace(/\/$/, "");
 
 const ROWS_PER_PAGE = 10;

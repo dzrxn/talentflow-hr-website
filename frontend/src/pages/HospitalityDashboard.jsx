@@ -569,7 +569,9 @@ ChartJS.register(
 
 const API_BASE = (
   import.meta.env.VITE_API_URL ||
+
   "https://talentflow-backend-ohup.onrender.com"
+
 ).replace(/\/$/, "");
 
 const DEFAULT_ENTITIES = ["NB Club Bellezea", "Chalukya Samrat"];
@@ -625,6 +627,7 @@ export default function HospitalityDashboard() {
       item["Property"] ||
       item["Hotel"] ||
       item["Unit"]
+
     ) || "Unknown";
 
   const getFunction = (item) =>
@@ -636,9 +639,11 @@ export default function HospitalityDashboard() {
   const getClosed = (item) =>
     toNumber(
       item["Closed"] ||
+
       item["Joined"] ||
       item["Total Closed"] ||
       item["Closed Positions"]
+
     );
 
   const getYTJ = (item) =>
@@ -655,8 +660,10 @@ export default function HospitalityDashboard() {
   const getReferral = (item) =>
     toNumber(
       item["Closed by Internal referral"] ||
+
       item["Closed by Internal Referral"] ||
       item["Internal Referral"]
+
     );
 
   const getTA = (item) =>

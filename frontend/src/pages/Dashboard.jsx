@@ -23,7 +23,7 @@ ChartJS.register(
 
 const API_URL = (
   import.meta.env.VITE_API_URL ||
-  "https://talentflow-backend-ohup.onrender.com"
+  "https://talentflow-hr-website-1jga.onrender.com"
 ).replace(/\/$/, "");
 
 const ENTITIES = [

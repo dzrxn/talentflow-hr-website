@@ -6,6 +6,7 @@ const API_BASE =
 
 const ROWS_PER_PAGE = 10;
 
+
 export default function HospitalityReports() {
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");

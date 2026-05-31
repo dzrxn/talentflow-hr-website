@@ -70,7 +70,7 @@ const STATUS_LIST = [
         footer: "Failed Verification",
     },
     {
-        key: "Not Required",
+        key: "BGV Not Required",
         color: "#06b6d4",
         footer: "No Verification",
     },
@@ -153,11 +153,17 @@ export default function BGVPage() {
 
     const filteredData = useMemo(() => {
         return bgvData.filter((item) => {
-            const month =
-                item.Month ||
-                item.MONTH ||
-                item.month ||
-                "";
+            const rawDate =
+                item["Date Of Joining"] || "";
+
+            let month = "";
+
+            if (rawDate) {
+                const date = new Date(rawDate);
+                month = date.toLocaleString("en-US", {
+                    month: "long",
+                });
+            }
 
             const category =
                 item.Category ||
@@ -460,12 +466,13 @@ export default function BGVPage() {
                                     (item, index) => (
                                         <tr key={index}>
                                             <td style={styles.td}>
-                                                {item[
-                                                    "Candidate Name"
-                                                ] ||
+                                                {
+                                                    item["Candiadte Name"] ||
+                                                    item["Candidate Name"] ||
                                                     item.Name ||
                                                     item.Candidate ||
-                                                    "-"}
+                                                    "-"
+                                                }
                                             </td>
 
                                             <td style={styles.td}>
@@ -481,7 +488,8 @@ export default function BGVPage() {
                                             </td>
 
                                             <td style={styles.td}>
-                                                {item.Month ||
+                                                {item["Date Of Joining"] ||
+                                                    item.Month ||
                                                     item.MONTH ||
                                                     "-"}
                                             </td>
